@@ -1,33 +1,29 @@
 # detect_animal.py
 
 import argparse
-from pathlib import Path
-import torch
-import cv2
-import numpy as np
-import sys
-import platform
 import os
+import platform
+import sys
 import time
+from pathlib import Path
+
+import cv2
+import torch
+
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Deteção automática de gatos e cães com YOLOv5",
-        add_help=False
+    parser = argparse.ArgumentParser(description="Deteção automática de gatos e cães com YOLOv5", add_help=False)
+    parser.add_argument("--source", type=str, help="‘web’ para webcam, ou caminho para imagem/vídeo ou pasta")
+    parser.add_argument("--view", action="store_true", help="Mostrar resultado em janela OpenCV")
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help="Gnome do ficheiro de saída (será guardado em Output/). Em modo pasta, é ignorado.",
     )
-    parser.add_argument( "--source", type=str,
-        help="‘web’ para webcam, ou caminho para imagem/vídeo ou pasta"
-    )
-    parser.add_argument( "--view", action="store_true",
-        help="Mostrar resultado em janela OpenCV"
-    )
-    parser.add_argument( "--output", type=str, default=None,
-        help="Nome do ficheiro de saída (será guardado em Output/). Em modo pasta, é ignorado."
-    )
-    parser.add_argument( "-h", "--help", action="store_true",
-        help="Mostrar ajuda e sair"
-    )
+    parser.add_argument("-h", "--help", action="store_true", help="Mostrar ajuda e sair")
     return parser.parse_args()
+
 
 def menu_simplificado():
     print("===== Detetor de Gatos e Cães com YOLOv5 =====")
@@ -39,6 +35,7 @@ def menu_simplificado():
     ver = input("Mostrar resultado em janela? [S/n]: ").strip().lower() != "n"
     return {"source": source, "view": ver, "output": None}
 
+
 def try_backend(idx, backend_flag, backend_name):
     cap = cv2.VideoCapture(idx, backend_flag)
     if cap.isOpened():
@@ -47,6 +44,7 @@ def try_backend(idx, backend_flag, backend_name):
     cap.release()
     print(f"[WARN] Backend {backend_name} falhou a abrir a câmara no índice {idx}.")
     return None
+
 
 def open_any_camera(max_index=3):
     sistema = platform.system()
@@ -68,16 +66,17 @@ def open_any_camera(max_index=3):
             print(f"[WARN] Backend Default falhou a abrir no índice {idx}.")
     return None
 
+
 def process_image(path_imagem: Path, model, view: bool, output_name: str):
     frame = cv2.imread(str(path_imagem))
     if frame is None:
-        print(f"Erro: não foi possível ler a imagem {path_imagem}.", file=sys.stderr)
+        print(f"Error: não foi possível ler a imagem {path_imagem}.", file=sys.stderr)
         sys.exit(1)
 
     try:
         results = model(frame)
     except Exception as e:
-        print(f"Erro no modelo ao processar a imagem: {e}", file=sys.stderr)
+        print(f"Error no modelo ao processar a imagem: {e}", file=sys.stderr)
         sys.exit(1)
 
     detections = results.pred[0]  # tensor Nx6: [x1, y1, x2, y2, conf, cls]
@@ -93,8 +92,7 @@ def process_image(path_imagem: Path, model, view: bool, output_name: str):
             continue
         x1, y1, x2, y2 = map(int, xyxy)
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-        cv2.putText(frame, label, (x1, y1 - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
+        cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
 
     n_cats = int((detections[:, -1] == 15).sum().item())
     n_dogs = int((detections[:, -1] == 16).sum().item())
@@ -123,6 +121,7 @@ def process_image(path_imagem: Path, model, view: bool, output_name: str):
     cv2.imwrite(str(out_file), frame)
     print(f"Annotated image saved to: {out_file}")
 
+
 def process_video(source: str, model, view: bool, output_name: str):
     """
     Processa um vídeo (ou webcam), desenha bounding boxes em cada frame,
@@ -134,18 +133,18 @@ def process_video(source: str, model, view: bool, output_name: str):
         print("[DEBUG] Tentando abrir câmara nos índices 0, 1, 2…")
         cap = open_any_camera(max_index=3)
         if not cap:
-            print("Erro: não foi possível abrir nenhuma câmara nos índices tentados.", file=sys.stderr)
+            print("Error: não foi possível abrir nenhuma câmara nos índices tentados.", file=sys.stderr)
             sys.exit(1)
         print("[INFO] Camera opened successfully.")
     else:
         cap = cv2.VideoCapture(source)
         if not cap.isOpened():
-            print(f"Erro: não foi possível abrir vídeo {source}.", file=sys.stderr)
+            print(f"Error: não foi possível abrir vídeo {source}.", file=sys.stderr)
             sys.exit(1)
 
     orig_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     orig_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps    = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     print(f"[DEBUG] Captured resolution: {orig_w}×{orig_h}, {fps:.2f} FPS")
 
     os.makedirs("Output", exist_ok=True)
@@ -163,7 +162,7 @@ def process_video(source: str, model, view: bool, output_name: str):
 
     ret, frame = cap.read()
     if not ret or frame is None:
-        print("Erro: a câmara abriu-se mas não devolve frames válidos.", file=sys.stderr)
+        print("Error: a câmara abriu-se mas não devolve frames válidos.", file=sys.stderr)
         cap.release()
         sys.exit(1)
     if not webcam_mode:
@@ -199,8 +198,7 @@ def process_video(source: str, model, view: bool, output_name: str):
                 continue
             x1, y1, x2, y2 = map(int, xyxy)
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-            cv2.putText(frame, label, (x1, y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
+            cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
 
         if view:
             cv2.imshow("Detection", frame)
@@ -210,7 +208,7 @@ def process_video(source: str, model, view: bool, output_name: str):
         writer.write(frame)
 
         elapsed = time.time() - start
-        print(f"[DEBUG] Frame processed in {elapsed*1000:.1f} ms ({1/elapsed:.1f} FPS)", end="\r")
+        print(f"[DEBUG] Frame processed in {elapsed * 1000:.1f} ms ({1 / elapsed:.1f} FPS)", end="\r")
 
     cap.release()
     writer.release()
@@ -218,6 +216,7 @@ def process_video(source: str, model, view: bool, output_name: str):
         cv2.destroyAllWindows()
 
     print(f"\nAnnotated video saved to: {out_file}")
+
 
 def process_folder(folder_path: Path, model, view: bool):
     img_exts = {".jpg", ".jpeg", ".png"}
@@ -238,47 +237,39 @@ def process_folder(folder_path: Path, model, view: bool):
         else:
             print(f"[SKIP] Unsupported extension, skipping: {entry.name}")
 
+
 def main():
     args = parse_args()
 
     if len(sys.argv) == 1:
         opts = menu_simplificado()
         source = opts["source"]
-        view   = opts["view"]
+        view = opts["view"]
         output = opts["output"]
     else:
         if args.help:
-            parser = argparse.ArgumentParser(
-                description="Deteção automática de gatos e cães com YOLOv5"
-            )
+            parser = argparse.ArgumentParser(description="Deteção automática de gatos e cães com YOLOv5")
             parser.add_argument(
-                "--source",
-                type=str,
-                required=True,
-                help="‘web’ para webcam, caminho para vídeo/imagem ou diretório"
+                "--source", type=str, required=True, help="‘web’ para webcam, caminho para vídeo/imagem ou diretório"
             )
-            parser.add_argument(
-                "--view",
-                action="store_true",
-                help="Mostrar resultado em janela"
-            )
+            parser.add_argument("--view", action="store_true", help="Mostrar resultado em janela")
             parser.add_argument(
                 "--output",
                 type=str,
                 default=None,
-                help="Nome do ficheiro de saída (só para 1 ficheiro). Se for diretório, ignora."
+                help="Gnome do ficheiro de saída (só para 1 ficheiro). Se for diretório, ignore.",
             )
             parser.print_help()
             sys.exit(0)
 
         if not args.source:
-            print("Erro: deve indicar --source (ficheiro, ‘web’ ou pasta).", file=sys.stderr)
+            print("Error: deve indicar --source (ficheiro, ‘web’ ou pasta).", file=sys.stderr)
             sys.exit(1)
 
         source = args.source
         if source.lower() == "web":
             source = "0"
-        view   = args.view
+        view = args.view
         output = args.output
 
     print("Loading YOLOv5 model…")
@@ -313,11 +304,12 @@ def main():
                 process_video(str(caminho), model, view, output_name)
 
             else:
-                print(f"Erro: formato não suportado: {ext}", file=sys.stderr)
+                print(f"Error: formato não suportado: {ext}", file=sys.stderr)
                 sys.exit(1)
         else:
-            print(f"Erro: caminho inválido: {source}", file=sys.stderr)
+            print(f"Error: caminho inválido: {source}", file=sys.stderr)
             sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
